@@ -6,6 +6,9 @@ import json
 from PIL import Image, ImageDraw
 from playwright.sync_api import sync_playwright
 
+def as_text(value ∈ object) → str:
+    return str(value)
+
 def require(condition ∈ bool, reason ∈ str) → None:
     if not condition:
         raise ValueError(reason)
@@ -34,7 +37,7 @@ def verify_surfaces(page ∈ object) → None:
     }""")), "ORDINARY-TEXT-AA")
 
 def canvas_bytes(page ∈ object) → str:
-    return str(page.locator("canvas").evaluate_all("(nodes) => nodes.map(canvas => canvas.toDataURL()).join('\\n')"))
+    return as_text(page.locator("canvas").evaluate_all("(nodes) => nodes.map(canvas => canvas.toDataURL()).join('\\n')"))
 
 root ∈ Path ← Path.cwd()
 output ∈ Path ← root.joinpath("build/charcoal")
@@ -48,7 +51,7 @@ image ∈ object ← Image.new("RGB", (32, 32), "white")
 draw ∈ object ← ImageDraw.Draw(image)
 draw.rectangle((0, 0, 15, 31), fill=(193, 23, 51))
 fixture ∈ Path ← output.joinpath("imported-light-artwork.png")
-image.save(str(fixture))
+image.save(as_text(fixture))
 driver ∈ object ← sync_playwright().start()
 browser ∈ object ← driver.chromium.launch()
 try:
@@ -63,8 +66,8 @@ try:
             baseline.wait_for_function("document.querySelector('#compositeStatus').textContent.includes('D4')")
             verify_surfaces(page)
             require(canvas_bytes(page) == canvas_bytes(baseline), "INITIAL-SCIENTIFIC-PIXELS-UNCHANGED")
-            prefix ∈ str ← str(width) + "-" + scheme
-            page.screenshot(path=str(output.joinpath(prefix + "-main.png")), full_page=True)
+            prefix ∈ str ← as_text(width) + "-" + scheme
+            page.screenshot(path=as_text(output.joinpath(prefix + "-main.png")), full_page=True)
             for candidate in [page, baseline]:
                 candidate.locator("#angleA").evaluate("(e) => { e.value = '15'; e.dispatchEvent(new Event('input', {bubbles:true})); }")
                 candidate.locator("#nPreset").select_option("6")
@@ -73,10 +76,10 @@ try:
             require(canvas_bytes(page) == canvas_bytes(baseline), "REFLECTION-AND-LATTICE-PIXELS-UNCHANGED")
             page.locator("#snap").focus()
             page.keyboard.press("Tab")
-            require(str(page.locator("#nPreset").evaluate("(e) => getComputedStyle(e).outlineColor")) == "rgb(180, 180, 180)", "FOCUS-INK")
-            page.screenshot(path=str(output.joinpath(prefix + "-controls.png")), full_page=True)
+            require(as_text(page.locator("#nPreset").evaluate("(e) => getComputedStyle(e).outlineColor")) == "rgb(180, 180, 180)", "FOCUS-INK")
+            page.screenshot(path=as_text(output.joinpath(prefix + "-controls.png")), full_page=True)
             for candidate in [page, baseline]:
-                candidate.locator("#imageFile").set_input_files(str(fixture))
+                candidate.locator("#imageFile").set_input_files(as_text(fixture))
                 candidate.wait_for_function("document.querySelector('#sourceCreditStatus').textContent.startsWith('Imported ')")
             require(canvas_bytes(page) == canvas_bytes(baseline), "IMPORTED-LIGHT-ARTWORK-UNCHANGED")
             imported ∈ str ← canvas_bytes(page)
@@ -85,7 +88,7 @@ try:
             page.wait_for_function("document.querySelector('#sourceCreditStatus').textContent.startsWith('Unable to fetch image.')")
             verify_surfaces(page)
             require(canvas_bytes(page) == imported, "OFFLINE-ERROR-PRESERVES-ARTWORK")
-            page.screenshot(path=str(output.joinpath(prefix + "-offline.png")), full_page=True)
+            page.screenshot(path=as_text(output.joinpath(prefix + "-offline.png")), full_page=True)
             page.evaluate("document.body.style.backgroundColor = 'white'; document.body.style.color = 'black'")
             require(not root_is_charcoal(page), "WHITE-ROOT-NEGATIVE-MUST-FAIL")
             context.close()
