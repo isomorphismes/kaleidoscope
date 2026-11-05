@@ -1,0 +1,5 @@
+build/
+.baseline/
+.ithon/
+.browser-runtime/
+ithon-check-receipt.jsonl
