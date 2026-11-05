@@ -1,0 +1,7 @@
+# Charcoal browser acceptance
+
+The visual correction changes CSS only. The entire scientific JavaScript is compared byte-for-byte with the pinned preceding source26bf5fa8. Actual headless Chromium executes both pages at phone/desktop widths and both system color schemes; every canvas data URL must match before and after mirror/crystal controls and a deliberately light imported image. This preserves exact scientific pixels rather than inferring preservation from a theme diff. External photos and artwork are not inverted.
+
+The same actual page is checked for neutral root/control surfaces, AA ordinary text, keyboard focus, an offline image-loading error that retains the imported image, and rejection of a white-root mutation. Screenshots and a source-bound JSON receipt are retained. Android and physical C67 execution are not claimed for this browser application.
+
+The host program is checked Ithon using the actual d6e83969 frontend and mandatory type checker; the host Python executable bootstraps that frontend and the existing Python Playwright API. An Idriç-only browser oracle would require a new browser/CDP boundary; no existing admitted one is used here. Types distinguish paths, rendered pages, exact canvas bytes and boolean observations. Browser JavaScript expressions query the existing DOM/browser API. No unchecked authored Python helper or production dependency is added. Hosted check/execution is pending at commit creation; any rejected attempt must be preserved before repair.

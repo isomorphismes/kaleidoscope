@@ -1,0 +1,95 @@
+"""Actual browser palette, input, offline, artwork and preceding-pixel acceptance."""
+from pathlib import Path
+from builtins import ValueError, bool, str, int, object, list
+import hashlib
+import json
+from PIL import Image, ImageDraw
+from playwright.sync_api import sync_playwright
+
+def require(condition ∈ bool, reason ∈ str) → None:
+    if not condition:
+        raise ValueError(reason)
+
+def root_is_charcoal(page ∈ object) → bool:
+    return bool(page.evaluate("getComputedStyle(document.body).backgroundColor === 'rgb(33, 33, 33)' && getComputedStyle(document.body).color === 'rgb(244, 244, 244)' && getComputedStyle(document.documentElement).colorScheme === 'dark'"))
+
+def verify_surfaces(page ∈ object) → None:
+    require(root_is_charcoal(page), "ROOT-CHARCOAL")
+    require(bool(page.evaluate("""() => {
+      const expected = [
+        ['.card', 'rgb(47, 47, 47)'], ['.controls', 'rgb(47, 47, 47)'],
+        ['.reference', 'rgb(47, 47, 47)'], ['button', 'rgb(56, 56, 56)'],
+        ['select', 'rgb(56, 56, 56)']
+      ];
+      return expected.every(([selector, color]) => Array.from(document.querySelectorAll(selector)).every(e => getComputedStyle(e).backgroundColor === color));
+    }""")), "CONTROL-SURFACES")
+    require(bool(page.evaluate("""() => {
+      const luminance = color => {
+        const channels = color.match(/[0-9.]+/g).slice(0,3).map(Number).map(c => c / 255).map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
+        return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+      };
+      const contrast = (a,b) => (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+      const surface = luminance('rgb(47,47,47)');
+      return ['.lead','.note','.overline','.muted','#compositeStatus','#sourceCreditStatus','.axis-a','.axis-b','button','select','a'].every(selector => Array.from(document.querySelectorAll(selector)).every(e => contrast(luminance(getComputedStyle(e).color), surface) >= 4.5));
+    }""")), "ORDINARY-TEXT-AA")
+
+def canvas_bytes(page ∈ object) → str:
+    return str(page.locator("canvas").evaluate_all("(nodes) => nodes.map(canvas => canvas.toDataURL()).join('\\n')"))
+
+root ∈ Path ← Path(__file__).resolve().parents[1]
+output ∈ Path ← root.joinpath("build/charcoal")
+output.mkdir(parents=True, exist_ok=True)
+original ∈ str ← root.joinpath(".baseline/index.html").read_text(encoding="utf-8")
+current ∈ str ← root.joinpath("index.html").read_text(encoding="utf-8")
+require(current.split("<script>", 1)[1] == original.split("<script>", 1)[1], "ORIGINAL-SCIENTIFIC-SCRIPT-UNCHANGED")
+image ∈ object ← Image.new("RGB", (32, 32), "white")
+draw ∈ object ← ImageDraw.Draw(image)
+draw.rectangle((0, 0, 15, 31), fill=(193, 23, 51))
+fixture ∈ Path ← output.joinpath("imported-light-artwork.png")
+image.save(str(fixture))
+driver ∈ object ← sync_playwright().start()
+browser ∈ object ← driver.chromium.launch()
+try:
+    for scheme in ["light", "dark"]:
+        for width in [390, 1280]:
+            context ∈ object ← browser.new_context(color_scheme=scheme, viewport={"width": width, "height": 900})
+            page ∈ object ← context.new_page()
+            baseline ∈ object ← context.new_page()
+            page.goto(root.joinpath("index.html").as_uri(), wait_until="domcontentloaded")
+            baseline.goto(root.joinpath(".baseline/index.html").as_uri(), wait_until="domcontentloaded")
+            page.wait_for_function("document.querySelector('#compositeStatus').textContent.includes('D4')")
+            baseline.wait_for_function("document.querySelector('#compositeStatus').textContent.includes('D4')")
+            verify_surfaces(page)
+            require(canvas_bytes(page) == canvas_bytes(baseline), "INITIAL-SCIENTIFIC-PIXELS-UNCHANGED")
+            prefix ∈ str ← str(width) + "-" + scheme
+            page.screenshot(path=str(output.joinpath(prefix + "-main.png")), full_page=True)
+            for candidate in [page, baseline]:
+                candidate.locator("#angleA").evaluate("(e) => { e.value = '15'; e.dispatchEvent(new Event('input', {bubbles:true})); }")
+                candidate.locator("#nPreset").select_option("6")
+                candidate.locator("#snap").click()
+                candidate.wait_for_function("document.querySelector('#compositeStatus').textContent.includes('D6')")
+            require(canvas_bytes(page) == canvas_bytes(baseline), "REFLECTION-AND-LATTICE-PIXELS-UNCHANGED")
+            page.locator("#snap").focus()
+            page.keyboard.press("Tab")
+            require(str(page.locator("#nPreset").evaluate("(e) => getComputedStyle(e).outlineColor")) == "rgb(180, 180, 180)", "FOCUS-INK")
+            page.screenshot(path=str(output.joinpath(prefix + "-controls.png")), full_page=True)
+            for candidate in [page, baseline]:
+                candidate.locator("#imageFile").set_input_files(str(fixture))
+                candidate.wait_for_function("document.querySelector('#sourceCreditStatus').textContent.startsWith('Imported ')")
+            require(canvas_bytes(page) == canvas_bytes(baseline), "IMPORTED-LIGHT-ARTWORK-UNCHANGED")
+            imported ∈ str ← canvas_bytes(page)
+            context.set_offline(True)
+            page.locator("#loadKlee").click()
+            page.wait_for_function("document.querySelector('#sourceCreditStatus').textContent.startsWith('Unable to fetch image.')")
+            verify_surfaces(page)
+            require(canvas_bytes(page) == imported, "OFFLINE-ERROR-PRESERVES-ARTWORK")
+            page.screenshot(path=str(output.joinpath(prefix + "-offline.png")), full_page=True)
+            page.evaluate("document.body.style.backgroundColor = 'white'; document.body.style.color = 'black'")
+            require(not root_is_charcoal(page), "WHITE-ROOT-NEGATIVE-MUST-FAIL")
+            context.close()
+    report ∈ str ← json.dumps({"source_sha256": hashlib.sha256(current.encode("utf-8")).hexdigest(), "palette": "PASS", "ordinary_text_aa": "PASS", "both_system_schemes": "PASS", "phone_and_desktop": "PASS", "scientific_pixels_and_import": "PASS", "offline_error": "PASS", "white_root_negative": "PASS", "android": "NOT_APPLICABLE", "physical_c67": "NOT_RUN"}, sort_keys=True, indent=2)
+    output.joinpath("receipt.json").write_text(report + "\n", encoding="utf-8")
+    print(report)
+finally:
+    browser.close()
+    driver.stop()
