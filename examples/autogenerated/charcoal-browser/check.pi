@@ -36,7 +36,7 @@ def verify_surfaces(page ∈ object) → None:
 def canvas_bytes(page ∈ object) → str:
     return str(page.locator("canvas").evaluate_all("(nodes) => nodes.map(canvas => canvas.toDataURL()).join('\\n')"))
 
-root ∈ Path ← Path(__file__).resolve().parents[1]
+root ∈ Path ← Path.cwd()
 output ∈ Path ← root.joinpath("build/charcoal")
 output.mkdir(parents=True, exist_ok=True)
 original ∈ str ← root.joinpath(".baseline/index.html").read_text(encoding="utf-8")
